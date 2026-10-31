@@ -102,6 +102,15 @@
     .active-halo {
       animation: subtlePulse 3s ease-in-out infinite;
     }
+
+    @media (max-width: 639px) {
+      @supports (height: 100dvh) {
+        body.h-screen,
+        main.h-screen {
+          height: 100dvh;
+        }
+      }
+    }
   </style>
 </head>
 <body class="h-screen w-screen overflow-hidden bg-[#f2f4f8] dark:bg-[#090a0f] text-zinc-900 dark:text-zinc-100 flex items-center justify-center transition-colors duration-300">
