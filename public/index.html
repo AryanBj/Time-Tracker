@@ -1,0 +1,1631 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl" class="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Focus — Study Time Tracker v1.0-beta</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'Vazirmatn', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'Vazirmatn', 'monospace'],
+          }
+        }
+      }
+    };
+  </script>
+
+  <!-- Google Fonts: Inter, JetBrains Mono & Vazirmatn -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600&family=Vazirmatn:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    * {
+      -webkit-tap-highlight-color: transparent;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: 'Inter', 'Vazirmatn', system-ui, sans-serif;
+      user-select: none;
+    }
+
+    /* Tabular numbers to prevent timer jitter */
+    .tabular-timer {
+      font-variant-numeric: tabular-nums;
+      font-feature-settings: "tnum";
+    }
+
+    /* Custom subtle scrollbars for internal lists only */
+    .custom-scroll::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+    .custom-scroll::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .custom-scroll::-webkit-scrollbar-thumb {
+      background: rgba(156, 163, 175, 0.35);
+      border-radius: 9999px;
+    }
+
+    /* Guaranteed LTR swipe track so RTL never shifts slides off-screen */
+    .views-viewport {
+      direction: ltr !important;
+      overflow: hidden;
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+
+    .views-track {
+      display: flex;
+      flex-direction: row;
+      direction: ltr !important;
+      width: 400%;
+      height: 100%;
+      transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+      will-change: transform;
+    }
+
+    .view-pane {
+      width: 25%;
+      height: 100%;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+
+    /* Circular progress ring animation */
+    .timer-ring-circle {
+      transition: stroke-dashoffset 0.35s ease, stroke 0.3s ease;
+      transform: rotate(-90deg);
+      transform-origin: 50% 50%;
+    }
+
+    /* Pulse halo when timer is active */
+    @keyframes subtlePulse {
+      0%, 100% { transform: scale(1); opacity: 0.14; }
+      50% { transform: scale(1.05); opacity: 0.28; }
+    }
+    .active-halo {
+      animation: subtlePulse 3s ease-in-out infinite;
+    }
+  </style>
+</head>
+<body class="h-screen w-screen overflow-hidden bg-[#f2f4f8] dark:bg-[#090a0f] text-zinc-900 dark:text-zinc-100 flex items-center justify-center transition-colors duration-300">
+
+  <!-- Ambient Minimal Background Glow -->
+  <div class="pointer-events-none fixed inset-0 overflow-hidden z-0 flex items-center justify-center">
+    <div class="w-[380px] h-[380px] md:w-[640px] md:h-[640px] rounded-full bg-indigo-500/5 dark:bg-indigo-500/10 blur-3xl transition-all duration-700"></div>
+  </div>
+
+  <!-- Main Responsive Container (Full-Screen on Mobile, Wide Modern Dashboard Card on Laptop/Desktop) -->
+  <main class="relative z-10 w-full h-screen sm:w-[94vw] sm:max-w-[560px] md:max-w-3xl lg:max-w-4xl sm:h-[90vh] md:h-[86vh] sm:max-h-[820px] md:max-h-[760px] bg-white/95 dark:bg-[#12131a]/95 backdrop-blur-2xl sm:rounded-[32px] md:rounded-3xl sm:shadow-[0_24px_80px_rgba(0,0,0,0.08)] dark:sm:shadow-[0_24px_80px_rgba(0,0,0,0.55)] sm:border border-zinc-200/80 dark:border-zinc-800/80 flex flex-col justify-between overflow-hidden transition-all duration-300">
+
+    <!-- ================= TOP HEADER ================= -->
+    <header class="px-5 sm:px-7 md:px-10 pt-4 sm:pt-5 md:pt-6 pb-3 flex items-center justify-between shrink-0 border-b border-zinc-100 dark:border-zinc-800/60">
+      <!-- App Brand & v1.0- Badge -->
+      <div class="flex items-center gap-2.5">
+        <div class="w-8 h-8 md:w-9 md:h-9 rounded-2xl bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 flex items-center justify-center shadow-sm">
+          <svg class="w-4 h-4 md:w-5 md:h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="13" r="8"></circle>
+            <path d="M12 9v4l2.5 2.5"></path>
+            <path d="M9 2h6"></path>
+          </svg>
+        </div>
+        <div class="flex items-center gap-2">
+          <h1 class="text-sm md:text-base font-bold tracking-tight" data-i18n="appTitle">فوکوس تایمر</h1>
+          <span class="text-[10px] px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 font-mono font-medium">v1.0-beta</span>
+          <span id="syncDot" class="w-2 h-2 rounded-full bg-emerald-500 transition-colors" title="Sync Active"></span>
+        </div>
+      </div>
+
+      <!-- Top Actions: CSV Export (auto-hidden on Tab 1), Language, Theme -->
+      <div class="flex items-center gap-1.5 md:gap-2">
+        <!-- Quick Export CSV/Excel Button with Mini CSV Badge (Hidden on Tab 1 / Intervals) -->
+        <button id="quickExportBtn" type="button" onclick="window.exportSessionsToExcel()" class="h-8 md:h-9 px-2.5 md:px-3 rounded-xl bg-zinc-100 hover:bg-zinc-200/80 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 flex items-center gap-1.5 text-xs font-medium transition-all" title="Export CSV / Excel">
+          <span class="px-1.5 py-0.5 rounded bg-emerald-600 text-white font-mono text-[9px] font-bold tracking-wider leading-none">CSV</span>
+          <span class="hidden sm:inline" data-i18n="excelShort">اکسل</span>
+        </button>
+
+        <!-- Language Switcher (FA / EN) -->
+        <button id="langToggleBtn" type="button" onclick="window.toggleLanguage()" class="h-8 md:h-9 px-2.5 md:px-3 rounded-xl bg-zinc-100 hover:bg-zinc-200/80 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-xs font-semibold text-zinc-700 dark:text-zinc-300 transition">
+          EN
+        </button>
+
+        <!-- Dark / Light Mode Toggle (Moon Icon) -->
+        <button id="themeToggleBtn" type="button" onclick="window.toggleTheme()" class="w-8 h-8 md:w-9 md:h-9 rounded-xl bg-zinc-100 hover:bg-zinc-200/80 dark:bg-zinc-800 dark:hover:bg-zinc-700 flex items-center justify-center text-zinc-700 dark:text-zinc-300 transition" aria-label="Toggle Theme">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- ================= SWIPEABLE VIEWPORT AREA ================= -->
+    <div class="views-viewport flex-1">
+      <div id="viewsTrack" class="views-track">
+
+        <!-- ==================== PANE 0: TIMER VIEW ==================== -->
+        <section class="view-pane flex flex-col items-center justify-between px-5 sm:px-8 md:px-12 py-3 md:py-5" data-pane-dir="rtl">
+          <!-- Subject / Topic Input Pill -->
+          <div class="w-full flex flex-col items-center">
+            <div class="relative w-full max-w-[280px] md:max-w-[360px]">
+              <input
+                id="subjectInput"
+                type="text"
+                maxlength="45"
+                oninput="window.handleSubjectChange(this.value)"
+                class="w-full px-4 py-2 md:py-2.5 text-xs md:text-sm text-center font-medium bg-zinc-100/90 dark:bg-zinc-800/80 border border-transparent focus:border-zinc-300 dark:focus:border-zinc-700 rounded-full text-zinc-800 dark:text-zinc-200 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none transition"
+                placeholder="مبحث مطالعه (مثلا: ریاضی، برنامه‌نویسی...)"
+                data-i18n-placeholder="subjectPlaceholder"
+              />
+            </div>
+          </div>
+
+          <!-- Center Dribbble-Inspired Minimalist Circular Dial -->
+          <div class="relative flex items-center justify-center my-auto">
+            <!-- Active Halo Ring -->
+            <div id="timerHalo" class="w-56 h-56 sm:w-64 sm:h-64 md:w-72 md:h-72 rounded-full bg-indigo-500/0 pointer-events-none absolute transition-all duration-500"></div>
+
+            <!-- SVG Progress Circle -->
+            <svg class="w-56 h-56 sm:w-64 sm:h-64 md:w-72 md:h-72" viewBox="0 0 260 260">
+              <!-- Subtle Background Track -->
+              <circle
+                cx="130"
+                cy="130"
+                r="114"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="3.5"
+                class="text-zinc-100 dark:text-zinc-800/90"
+              />
+              <!-- Subtle Tick Marks Ring -->
+              <circle
+                cx="130"
+                cy="130"
+                r="104"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1"
+                stroke-dasharray="2 10"
+                class="text-zinc-200 dark:text-zinc-800"
+              />
+              <!-- Animated Progress Arc -->
+              <circle
+                id="timerProgressCircle"
+                cx="130"
+                cy="130"
+                r="114"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="4.5"
+                stroke-linecap="round"
+                stroke-dasharray="716.28"
+                stroke-dashoffset="716.28"
+                class="timer-ring-circle text-zinc-900 dark:text-white"
+              />
+            </svg>
+
+            <!-- Digital Time Display Inside Ring -->
+            <div class="absolute inset-0 flex flex-col items-center justify-center text-center px-4">
+              <span id="timerStateBadge" class="text-[11px] font-medium uppercase tracking-widest px-2.5 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 mb-2 transition-colors" data-i18n="statusReady">
+                آماده شروع
+              </span>
+
+              <div id="mainTimerDisplay" dir="ltr" class="tabular-timer text-4xl sm:text-[42px] md:text-5xl font-light tracking-tight text-zinc-900 dark:text-white select-all">
+                00:00:00
+              </div>
+
+              <p id="todayTotalMini" class="text-[11px] md:text-xs text-zinc-400 dark:text-zinc-500 mt-2.5 font-medium">
+                امروز: 00:00:00
+              </p>
+            </div>
+          </div>
+
+          <!-- Single Main Start/Pause Button + Small Finish Button Directly Underneath -->
+          <div class="w-full flex flex-col items-center gap-2.5">
+            <button
+              id="startPauseBtn"
+              type="button"
+              onclick="window.toggleStartPause()"
+              class="w-full max-w-[230px] md:max-w-[260px] py-3.5 rounded-[22px] bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-semibold text-sm shadow-lg shadow-zinc-900/15 dark:shadow-white/10 hover:opacity-95 active:scale-[0.98] flex items-center justify-center gap-2.5 transition-all"
+            >
+              <!-- Play Icon SVG -->
+              <svg id="playSvgIcon" class="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                <polygon points="6 3 20 12 6 21 6 3"></polygon>
+              </svg>
+              <!-- Pause Icon SVG -->
+              <svg id="pauseSvgIcon" class="w-4 h-4 fill-current hidden" viewBox="0 0 24 24">
+                <rect x="6" y="4" width="4" height="16" rx="1"></rect>
+                <rect x="14" y="4" width="4" height="16" rx="1"></rect>
+              </svg>
+              <span id="startPauseText" data-i18n="startBtn">شروع مطالعه</span>
+            </button>
+
+            <!-- Small Sleek Finish Button Underneath -->
+            <button
+              id="finishTimerBtn"
+              type="button"
+              onclick="window.finishAndSaveSession()"
+              disabled
+              class="h-8 px-4 rounded-full bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-700 dark:text-emerald-400 disabled:opacity-30 disabled:pointer-events-none text-xs font-semibold flex items-center justify-center gap-1.5 transition active:scale-95"
+            >
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+              <span data-i18n="finishBtn">Finish</span>
+            </button>
+          </div>
+        </section>
+
+        <!-- ==================== PANE 1: INTERVALS / SESSIONS VIEW ==================== -->
+        <section class="view-pane flex flex-col justify-between px-5 sm:px-8 md:px-10 py-3 md:py-5" data-pane-dir="rtl">
+          <!-- Header & Action Bar -->
+          <div class="flex items-center justify-between mb-3 shrink-0">
+            <div>
+              <h2 class="text-base md:text-lg font-bold text-zinc-900 dark:text-white" data-i18n="historyTitle">بازه‌های مطالعه</h2>
+              <p id="historyCountSubtitle" class="text-xs text-zinc-400 dark:text-zinc-500">0 بازه ثبت شده</p>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <!-- Manual Add Button with Clean + Sign -->
+              <button
+                type="button"
+                onclick="window.openManualModal()"
+                class="h-8 md:h-9 px-3 md:px-3.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 text-xs font-semibold flex items-center gap-1.5 transition"
+              >
+                <span class="text-base font-bold leading-none">+</span>
+                <span data-i18n="addManualBtn">افزودن</span>
+              </button>
+
+              <!-- Excel / CSV Export Button with Mini CSV Badge -->
+              <button
+                type="button"
+                onclick="window.exportSessionsToExcel()"
+                class="h-8 md:h-9 px-3 md:px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm transition"
+              >
+                <span class="px-1.5 py-0.5 rounded bg-white/20 font-mono text-[9px] font-bold leading-none">CSV</span>
+                <span data-i18n="exportExcelBtn">خروجی اکسل</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Responsive Scrollable Sessions Grid (1 col on Mobile, 2 cols on Laptop/Desktop) -->
+          <div id="sessionsListContainer" class="flex-1 overflow-y-auto custom-scroll pe-1 grid grid-cols-1 md:grid-cols-2 gap-2.5 content-start">
+            <!-- Dynamically populated via JS -->
+          </div>
+        </section>
+
+        <!-- ==================== PANE 2: ANALYTICS / CUSTOM BAR CHART VIEW ==================== -->
+        <section class="view-pane flex flex-col justify-between px-5 sm:px-8 md:px-10 py-3 md:py-5" data-pane-dir="rtl">
+          <div class="shrink-0 mb-2 flex items-center justify-between">
+            <div>
+              <h2 class="text-base md:text-lg font-bold text-zinc-900 dark:text-white" data-i18n="analyticsTitle">آمار و نمودار</h2>
+              <p class="text-xs text-zinc-400 dark:text-zinc-500" data-i18n="analyticsSubtitle">عملکرد ۷ روز گذشته</p>
+            </div>
+          </div>
+
+          <!-- 3 Summary KPI Cards -->
+          <div class="grid grid-cols-3 gap-2.5 md:gap-4 my-1.5 shrink-0">
+            <div class="p-3 md:p-4 rounded-2xl bg-zinc-100/80 dark:bg-zinc-800/60 border border-zinc-200/60 dark:border-zinc-800">
+              <span class="text-[11px] md:text-xs text-zinc-400 dark:text-zinc-500 block mb-1" data-i18n="statToday">امروز</span>
+              <span id="statTodayVal" dir="ltr" class="tabular-timer text-xs sm:text-sm md:text-base font-bold text-zinc-900 dark:text-white">00:00:00</span>
+            </div>
+            <div class="p-3 md:p-4 rounded-2xl bg-zinc-100/80 dark:bg-zinc-800/60 border border-zinc-200/60 dark:border-zinc-800">
+              <span class="text-[11px] md:text-xs text-zinc-400 dark:text-zinc-500 block mb-1" data-i18n="statWeek">۷ روز اخیر</span>
+              <span id="statWeekVal" dir="ltr" class="tabular-timer text-xs sm:text-sm md:text-base font-bold text-zinc-900 dark:text-white">00:00:00</span>
+            </div>
+            <div class="p-3 md:p-4 rounded-2xl bg-zinc-100/80 dark:bg-zinc-800/60 border border-zinc-200/60 dark:border-zinc-800">
+              <span class="text-[11px] md:text-xs text-zinc-400 dark:text-zinc-500 block mb-1" data-i18n="statTotal">کل زمان</span>
+              <span id="statTotalVal" dir="ltr" class="tabular-timer text-xs sm:text-sm md:text-base font-bold text-indigo-600 dark:text-indigo-400">00:00:00</span>
+            </div>
+          </div>
+
+          <!-- Guaranteed-Render Interactive Custom Bar Chart (Zero External Library Failure) -->
+          <div class="flex-1 min-h-[170px] max-h-[270px] w-full bg-zinc-50/90 dark:bg-zinc-800/30 rounded-3xl p-4 md:p-6 border border-zinc-200/60 dark:border-zinc-800/70 flex flex-col justify-between my-1">
+            <div id="customBarChart" class="flex-1 flex items-end justify-between gap-2 sm:gap-4 md:gap-6 pt-6 pb-2 px-1 border-b border-zinc-200/70 dark:border-zinc-700/60">
+              <!-- Populated by JS -->
+            </div>
+            <div id="customBarLabels" class="grid grid-cols-7 gap-2 sm:gap-4 md:gap-6 pt-2 text-center">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+
+          <!-- Top Subject Summary Pill -->
+          <div class="mt-1 py-2.5 md:py-3 px-4 md:px-5 rounded-2xl bg-zinc-100/80 dark:bg-zinc-800/50 flex items-center justify-between text-xs md:text-sm shrink-0">
+            <span class="text-zinc-500 dark:text-zinc-400" data-i18n="mostStudiedLabel">بیشترین تمرکز:</span>
+            <span id="topSubjectVal" class="font-semibold text-zinc-800 dark:text-zinc-200">—</span>
+          </div>
+        </section>
+
+        <!-- ==================== PANE 3: ACCOUNT & DEVELOPER PROFILE ==================== -->
+        <section class="view-pane flex flex-col justify-between px-5 sm:px-8 md:px-10 py-3 md:py-5 overflow-y-auto custom-scroll" data-pane-dir="rtl">
+          <div class="w-full max-w-xl mx-auto flex flex-col justify-between h-full gap-3">
+            <!-- Cloud Account Sync Section -->
+            <div class="space-y-3">
+              <div>
+                <h2 class="text-base md:text-lg font-bold text-zinc-900 dark:text-white" data-i18n="accountTitle">حساب کاربری</h2>
+              </div>
+
+              <!-- Logged In User State Card -->
+              <div id="loggedInCard" class="hidden p-4 rounded-3xl bg-zinc-100/90 dark:bg-zinc-800/60 border border-zinc-200/60 dark:border-zinc-700/60">
+                <div class="flex items-center justify-between gap-2">
+                  <div class="flex items-center gap-2.5 overflow-hidden">
+                    <div class="w-9 h-9 md:w-10 md:h-10 rounded-2xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                      <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="12" cy="7" r="4"></circle>
+                      </svg>
+                    </div>
+                    <div class="truncate">
+                      <p id="userEmailDisplay" class="text-xs md:text-sm font-semibold text-zinc-900 dark:text-white truncate">Connected</p>
+                      <p id="userUidDisplay" class="text-[10px] font-mono text-zinc-400 truncate">UID: ...</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onclick="window.handleSignOut()"
+                    class="px-3 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 text-xs font-semibold transition shrink-0"
+                    data-i18n="signOutBtn"
+                  >
+                    خروج
+                  </button>
+                </div>
+              </div>
+
+              <!-- Email / Password Login & Register Form -->
+              <div id="authFormCard" class="p-4 md:p-5 rounded-3xl bg-zinc-100/80 dark:bg-zinc-800/50 border border-zinc-200/60 dark:border-zinc-800 space-y-2.5">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                  <input
+                    id="authEmailInput"
+                    type="email"
+                    dir="ltr"
+                    placeholder="Email address"
+                    class="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-zinc-400"
+                  />
+                  <input
+                    id="authPasswordInput"
+                    type="password"
+                    dir="ltr"
+                    placeholder="Password (min 6 chars)"
+                    class="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-zinc-400"
+                  />
+                </div>
+                <div class="flex items-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    onclick="window.handleEmailAuth('login')"
+                    class="flex-1 py-2.5 rounded-xl bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-xs font-semibold hover:opacity-90 transition"
+                    data-i18n="loginBtn"
+                  >
+                    ورود به حساب
+                  </button>
+                  <button
+                    type="button"
+                    onclick="window.handleEmailAuth('signup')"
+                    class="flex-1 py-2.5 rounded-xl bg-zinc-200 dark:bg-zinc-700 text-zinc-800 dark:text-zinc-200 text-xs font-semibold hover:opacity-90 transition"
+                    data-i18n="signupBtn"
+                  >
+                    ثبت‌نام جدید
+                  </button>
+                </div>
+
+                <!-- Google Sign-In Button with Official Multi-Color Google Logo SVG -->
+                <button
+                  type="button"
+                  onclick="window.handleGoogleAuth()"
+                  class="w-full py-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs font-semibold flex items-center justify-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition"
+                >
+                  <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                    <path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.7l3.1-3.1C17.3 1.8 14.8 1 12 1 7.4 1 3.5 3.6 1.6 7.4l3.7 2.8C6.2 7.2 8.9 5 12 5z"/>
+                    <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.6l3.7 2.9c2.2-2 3.7-5 3.7-8.7z"/>
+                    <path fill="#FBBC05" d="M5.3 14.8c-.2-.8-.4-1.6-.4-2.5s.2-1.7.4-2.5L1.6 7C.6 9 0 11.2 0 13.5s.6 4.5 1.6 6.5l3.7-2.9z"/>
+                    <path fill="#34A853" d="M12 24c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3.1 0-5.8-2.1-6.7-5l-3.7 2.9C3.5 21.4 7.4 24 12 24z"/>
+                  </svg>
+                  <span data-i18n="googleLoginBtn">ورود با حساب گوگل</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Developer Specifications Card (AryanBj) with GitHub & Gmail Logos & v1.0-beta -->
+            <div class="p-4 md:p-5 rounded-3xl bg-gradient-to-br from-zinc-900 to-zinc-800 dark:from-zinc-800/90 dark:to-zinc-900 text-white shadow-md">
+              <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center gap-2.5">
+                  <div class="w-9 h-9 rounded-2xl bg-white/10 flex items-center justify-center text-white font-bold text-sm">
+                    AB
+                  </div>
+                  <div>
+                    <h3 class="text-xs md:text-sm font-semibold tracking-wide">AryanBj</h3>
+                    <p class="text-[10px] text-zinc-400" data-i18n="devRole">طراح و توسعه‌دهنده</p>
+                  </div>
+                </div>
+                <span class="text-[10px] px-2.5 py-0.5 rounded-full bg-white/10 text-zinc-300 font-mono">v1.0-beta</span>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <!-- GitHub Button with Official GitHub Logo SVG -->
+                <a
+                  href="https://github.com/AryanBj"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-medium transition"
+                >
+                  <svg class="w-4 h-4 fill-current shrink-0" viewBox="0 0 24 24">
+                    <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
+                  </svg>
+                  <span>github.com/AryanBj</span>
+                </a>
+
+                <!-- Gmail Button with Official Gmail Logo SVG -->
+                <a
+                  href="mailto:aryanbj2@gmail.com"
+                  class="flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-medium transition truncate"
+                >
+                  <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                    <path fill="#EA4335" d="M20 4H4C2.9 4 2 4.9 2 6v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4.2-8 5-8-5V6l8 5 8-5v2.2z"/>
+                  </svg>
+                  <span class="truncate">aryanbj2@gmail.com</span>
+                </a>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </div>
+
+    <!-- ================= BOTTOM NAVIGATION DOCK & MINI FOOTER ================= -->
+    <footer class="px-5 sm:px-8 md:px-10 pb-3.5 pt-2 shrink-0 flex flex-col items-center gap-2 border-t border-zinc-100 dark:border-zinc-800/60">
+      <!-- Pill Dock -->
+      <nav class="w-full max-w-md h-12 sm:h-13 p-1 rounded-[20px] bg-zinc-100/90 dark:bg-zinc-800/80 flex items-center justify-between border border-zinc-200/60 dark:border-zinc-700/50">
+        <button
+          type="button"
+          onclick="window.switchTab(0)"
+          id="navBtn0"
+          class="nav-tab-btn flex-1 h-full rounded-[15px] flex items-center justify-center gap-1.5 text-xs font-semibold transition-all duration-300 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-sm"
+        >
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="13" r="8"></circle>
+            <path d="M12 9v4l2.5 2.5"></path>
+            <path d="M9 2h6"></path>
+          </svg>
+          <span data-i18n="navTimer">تایمر</span>
+        </button>
+
+        <button
+          type="button"
+          onclick="window.switchTab(1)"
+          id="navBtn1"
+          class="nav-tab-btn flex-1 h-full rounded-[15px] flex items-center justify-center gap-1.5 text-xs font-medium transition-all duration-300 text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200"
+        >
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="8" y1="6" x2="21" y2="6"></line>
+            <line x1="8" y1="12" x2="21" y2="12"></line>
+            <line x1="8" y1="18" x2="21" y2="18"></line>
+            <line x1="3" y1="6" x2="3.01" y2="6"></line>
+            <line x1="3" y1="12" x2="3.01" y2="12"></line>
+            <line x1="3" y1="18" x2="3.01" y2="18"></line>
+          </svg>
+          <span data-i18n="navIntervals">بازه‌ها</span>
+        </button>
+
+        <button
+          type="button"
+          onclick="window.switchTab(2)"
+          id="navBtn2"
+          class="nav-tab-btn flex-1 h-full rounded-[15px] flex items-center justify-center gap-1.5 text-xs font-medium transition-all duration-300 text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200"
+        >
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="20" x2="18" y2="10"></line>
+            <line x1="12" y1="20" x2="12" y2="4"></line>
+            <line x1="6" y1="20" x2="6" y2="14"></line>
+          </svg>
+          <span data-i18n="navChart">نمودار</span>
+        </button>
+
+        <button
+          type="button"
+          onclick="window.switchTab(3)"
+          id="navBtn3"
+          class="nav-tab-btn flex-1 h-full rounded-[15px] flex items-center justify-center gap-1.5 text-xs font-medium transition-all duration-300 text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200"
+        >
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+            <circle cx="12" cy="7" r="4"></circle>
+          </svg>
+          <span data-i18n="navAccount">حساب</span>
+        </button>
+      </nav>
+
+      <!-- Ultra-Minimal Developer Credit Bar with GitHub & Gmail SVG Icons -->
+      <div class="w-full max-w-md flex items-center justify-between px-2 text-[10px] text-zinc-400 dark:text-zinc-500" dir="ltr">
+        <a href="https://github.com/AryanBj" target="_blank" rel="noopener noreferrer" class="hover:text-zinc-700 dark:hover:text-zinc-300 flex items-center gap-1.5 transition">
+          <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+            <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
+          </svg>
+          <span>github.com/AryanBj</span>
+        </a>
+        <a href="mailto:aryanbj2@gmail.com" class="hover:text-zinc-700 dark:hover:text-zinc-300 flex items-center gap-1 transition">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24">
+            <path fill="#EA4335" d="M20 4H4C2.9 4 2 4.9 2 6v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4.2-8 5-8-5V6l8 5 8-5v2.2z"/>
+          </svg>
+          <span>aryanbj2@gmail.com</span>
+        </a>
+      </div>
+    </footer>
+
+    <!-- ================= MANUAL SESSION MODAL (IN-FRAME) ================= -->
+    <div id="manualModal" class="hidden absolute inset-0 z-40 bg-black/45 backdrop-blur-sm flex items-center justify-center p-6">
+      <div class="w-full max-w-[340px] bg-white dark:bg-zinc-900 rounded-3xl p-5 shadow-2xl border border-zinc-200 dark:border-zinc-800 space-y-3">
+        <div class="flex items-center justify-between">
+          <h3 class="text-sm font-semibold text-zinc-900 dark:text-white" data-i18n="manualModalTitle">ثبت دستی بازه مطالعه</h3>
+          <button type="button" onclick="window.closeManualModal()" class="w-7 h-7 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-500 text-sm font-bold">
+            ✕
+          </button>
+        </div>
+
+        <div class="space-y-2">
+          <label class="block text-[11px] text-zinc-400" data-i18n="subjectLabel">مبحث مطالعه</label>
+          <input id="manualSubject" type="text" class="w-full px-3 py-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-xs focus:outline-none" placeholder="مثلا: فیزیک" />
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-[11px] text-zinc-400 mb-1" data-i18n="hoursLabel">ساعت</label>
+            <input id="manualHours" type="number" min="0" max="23" value="0" dir="ltr" class="w-full px-3 py-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-xs text-center focus:outline-none" />
+          </div>
+          <div>
+            <label class="block text-[11px] text-zinc-400 mb-1" data-i18n="minutesLabel">دقیقه</label>
+            <input id="manualMinutes" type="number" min="1" max="59" value="45" dir="ltr" class="w-full px-3 py-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-xs text-center focus:outline-none" />
+          </div>
+        </div>
+
+        <button type="button" onclick="window.saveManualSession()" class="w-full py-2.5 rounded-xl bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-xs font-semibold mt-2" data-i18n="saveManualBtn">
+          ذخیره بازه
+        </button>
+      </div>
+    </div>
+
+    <!-- ================= DELETE CONFIRMATION MODAL (IN-FRAME) ================= -->
+    <div id="deleteConfirmModal" class="hidden absolute inset-0 z-50 bg-black/45 backdrop-blur-sm flex items-center justify-center p-6">
+      <div class="w-full max-w-[340px] bg-white dark:bg-zinc-900 rounded-3xl p-5 shadow-2xl border border-zinc-200 dark:border-zinc-800 space-y-4 text-center">
+        <div class="w-11 h-11 rounded-2xl bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center justify-center mx-auto">
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+          </svg>
+        </div>
+
+        <div class="space-y-1.5">
+          <h3 class="text-sm font-bold text-zinc-900 dark:text-white" data-i18n="deleteConfirmTitle">حذف بازه مطالعه</h3>
+          <p class="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed" data-i18n="deleteConfirmQuestion">
+            آیا از حذف این بازه مطالعه اطمینان دارید؟
+          </p>
+          <div id="deleteConfirmSessionInfo" dir="ltr" class="mt-2 py-1.5 px-3 rounded-xl bg-zinc-100 dark:bg-zinc-800/80 text-[11px] font-medium text-zinc-700 dark:text-zinc-300 truncate">
+            —
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2.5 pt-1">
+          <button
+            type="button"
+            onclick="window.closeDeleteConfirmModal()"
+            class="flex-1 py-2.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs font-semibold transition"
+            data-i18n="cancelDeleteBtn"
+          >
+            انصراف
+          </button>
+          <button
+            type="button"
+            onclick="window.confirmDeleteSession()"
+            class="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold shadow-sm shadow-rose-600/20 transition"
+            data-i18n="confirmDeleteBtn"
+          >
+            حذف
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= TOAST NOTIFICATION ================= -->
+    <div id="toastBox" class="pointer-events-none absolute top-16 left-1/2 -translate-x-1/2 z-50 opacity-0 -translate-y-2 transition-all duration-300 px-4 py-2 rounded-2xl bg-zinc-900/95 dark:bg-white/95 text-white dark:text-zinc-900 text-xs font-medium shadow-lg flex items-center gap-2">
+      <span id="toastText">Notification</span>
+    </div>
+
+  </main>
+
+  <!-- ================= SYNCHRONOUS GUARANTEED CORE SCRIPT (WORKS 100% OFFLINE/ONLINE) ================= -->
+  <script>
+    (function () {
+      // LocalStorage Keys
+      const LS_TIMER_KEY = "focus_timer_state_v3";
+      const LS_SESSIONS_KEY = "focus_sessions_cache_v3";
+      const LS_LANG_KEY = "focus_lang_v3";
+      const LS_THEME_KEY = "focus_theme_v3";
+
+      // Bilingual Dictionary
+      const i18n = {
+        fa: {
+          appTitle: "فوکوس تایمر",
+          excelShort: "اکسل",
+          subjectPlaceholder: "مبحث مطالعه (مثلا: ریاضی، برنامه‌نویسی...)",
+          statusReady: "آماده شروع",
+          statusRunning: "در حال مطالعه",
+          statusPaused: "متوقف شده",
+          startBtn: "شروع مطالعه",
+          resumeBtn: "ادامه مطالعه",
+          pauseBtn: "توقف موقت",
+          finishBtn: "Finish",
+          todayPrefix: "امروز:",
+          historyTitle: "بازه‌های مطالعه",
+          addManualBtn: "افزودن",
+          exportExcelBtn: "خروجی اکسل",
+          analyticsTitle: "آمار و نمودار",
+          analyticsSubtitle: "عملکرد ۷ روز گذشته (دقیقه)",
+          statToday: "امروز",
+          statWeek: "۷ روز اخیر",
+          statTotal: "کل زمان",
+          mostStudiedLabel: "بیشترین تمرکز:",
+          accountTitle: "حساب کاربری",
+          signOutBtn: "خروج",
+          loginBtn: "ورود به حساب",
+          signupBtn: "ثبت‌نام جدید",
+          googleLoginBtn: "ورود با حساب گوگل",
+          devRole: "طراح و توسعه‌دهنده",
+          navTimer: "تایمر",
+          navIntervals: "بازه‌ها",
+          navChart: "نمودار",
+          navAccount: "حساب",
+          manualModalTitle: "ثبت دستی بازه مطالعه",
+          subjectLabel: "مبحث مطالعه",
+          hoursLabel: "ساعت",
+          minutesLabel: "دقیقه",
+          saveManualBtn: "ذخیره بازه",
+          deleteConfirmTitle: "حذف بازه مطالعه",
+          deleteConfirmQuestion: "آیا از حذف این بازه مطالعه اطمینان دارید؟",
+          confirmDeleteBtn: "حذف",
+          cancelDeleteBtn: "انصراف",
+          untitledSubject: "مطالعه آزاد",
+          emptyHistory: "هنوز بازه‌ای ثبت نشده است.",
+          sessionsCountSuffix: "بازه ثبت شده",
+          savedToast: "بازه مطالعه با موفقیت ذخیره شد",
+          deletedToast: "بازه مطالعه حذف شد",
+          excelExportedToast: "فایل اکسل (CSV) دانلود شد",
+          noDataExportToast: "داده‌ای برای خروجی اکسل وجود ندارد",
+          syncGuest: "حالت مهمان"
+        },
+        en: {
+          appTitle: "Focus Timer",
+          excelShort: "Excel",
+          subjectPlaceholder: "Study subject (e.g., Math, Coding...)",
+          statusReady: "Ready",
+          statusRunning: "Focusing",
+          statusPaused: "Paused",
+          startBtn: "Start Focus",
+          resumeBtn: "Resume",
+          pauseBtn: "Pause",
+          finishBtn: "Finish",
+          todayPrefix: "Today:",
+          historyTitle: "Study Intervals",
+          addManualBtn: "Add",
+          exportExcelBtn: "Export Excel",
+          analyticsTitle: "Analytics",
+          analyticsSubtitle: "Last 7 Days Performance (Minutes)",
+          statToday: "Today",
+          statWeek: "Last 7 Days",
+          statTotal: "Total Time",
+          mostStudiedLabel: "Top Focus:",
+          accountTitle: "User Account",
+          signOutBtn: "Sign Out",
+          loginBtn: "Sign In",
+          signupBtn: "Sign Up",
+          googleLoginBtn: "Continue with Google",
+          devRole: "Creator & Developer",
+          navTimer: "Timer",
+          navIntervals: "Intervals",
+          navChart: "Chart",
+          navAccount: "Account",
+          manualModalTitle: "Log Study Interval",
+          subjectLabel: "Study Subject",
+          hoursLabel: "Hours",
+          minutesLabel: "Minutes",
+          saveManualBtn: "Save Interval",
+          deleteConfirmTitle: "Delete Study Interval",
+          deleteConfirmQuestion: "Are you sure you want to delete this study session?",
+          confirmDeleteBtn: "Delete",
+          cancelDeleteBtn: "Cancel",
+          untitledSubject: "General Study",
+          emptyHistory: "No study intervals recorded yet.",
+          sessionsCountSuffix: "intervals recorded",
+          savedToast: "Study session saved",
+          deletedToast: "Session deleted",
+          excelExportedToast: "Excel (CSV) file downloaded",
+          noDataExportToast: "No sessions to export yet",
+          syncGuest: "Guest Session"
+        }
+      };
+
+      // State
+      let currentLang = localStorage.getItem(LS_LANG_KEY) || "fa";
+      let currentTheme = localStorage.getItem(LS_THEME_KEY) || "light";
+      let activeTab = 0;
+      let pendingDeleteSessionId = null;
+
+      let timerState = {
+        isRunning: false,
+        startTime: null,
+        accumulatedMs: 0,
+        sessionInitialStart: null,
+        subject: "",
+        updatedAt: 0
+      };
+
+      let sessions = [];
+
+      // Cloud Hooks (attached dynamically when Firebase loads)
+      window.__cloudHooks = {
+        syncTimer: function () {},
+        saveSession: function () {},
+        deleteSession: function () {},
+        emailAuth: function () { showToast("Connecting to Firebase Auth..."); },
+        googleAuth: function () { showToast("Connecting to Google Auth..."); },
+        signOut: function () {}
+      };
+
+      // Helpers
+      function formatHMS(totalSeconds) {
+        const sec = Math.max(0, Math.floor(totalSeconds || 0));
+        const h = String(Math.floor(sec / 3600)).padStart(2, "0");
+        const m = String(Math.floor((sec % 3600) / 60)).padStart(2, "0");
+        const s = String(sec % 60).padStart(2, "0");
+        return h + ":" + m + ":" + s;
+      }
+
+      function escapeHtml(str) {
+        return String(str || "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
+      }
+
+      let toastTimeout = null;
+      function showToast(msg) {
+        const box = document.getElementById("toastBox");
+        const txt = document.getElementById("toastText");
+        if (!box || !txt) return;
+        txt.textContent = msg;
+        box.classList.remove("opacity-0", "-translate-y-2");
+        box.classList.add("opacity-100", "translate-y-0");
+        if (toastTimeout) clearTimeout(toastTimeout);
+        toastTimeout = setTimeout(function () {
+          box.classList.add("opacity-0", "-translate-y-2");
+          box.classList.remove("opacity-100", "translate-y-0");
+        }, 2600);
+      }
+      window.showToast = showToast;
+
+      // Timer Computation
+      function getElapsedMs() {
+        if (!timerState.isRunning || !timerState.startTime) {
+          return Number(timerState.accumulatedMs || 0);
+        }
+        return Number(timerState.accumulatedMs || 0) + Math.max(0, Date.now() - timerState.startTime);
+      }
+
+      function persistLocalTimer() {
+        try {
+          localStorage.setItem(LS_TIMER_KEY, JSON.stringify(timerState));
+        } catch (e) {}
+        window.__cloudHooks.syncTimer(timerState);
+      }
+
+      function persistLocalSessions() {
+        try {
+          localStorage.setItem(LS_SESSIONS_KEY, JSON.stringify(sessions));
+        } catch (e) {}
+      }
+
+      function getTodayTotalSeconds() {
+        const startOfToday = new Date();
+        startOfToday.setHours(0, 0, 0, 0);
+        const todayMs = startOfToday.getTime();
+        return sessions.reduce(function (acc, s) {
+          return (s.endTime || 0) >= todayMs ? acc + Number(s.durationSeconds || 0) : acc;
+        }, 0);
+      }
+
+      // Update Timer UI
+      function updateTimerUI() {
+        const elapsedMs = getElapsedMs();
+        const totalSeconds = Math.floor(elapsedMs / 1000);
+
+        const mainDisp = document.getElementById("mainTimerDisplay");
+        if (mainDisp) mainDisp.textContent = formatHMS(totalSeconds);
+
+        const circumference = 716.28;
+        const cycleProgress = (totalSeconds % 3600) / 3600;
+        const offset = circumference - cycleProgress * circumference;
+        const circleEl = document.getElementById("timerProgressCircle");
+        if (circleEl) {
+          circleEl.style.strokeDashoffset = totalSeconds === 0 ? circumference : offset;
+        }
+
+        const badge = document.getElementById("timerStateBadge");
+        const playSvg = document.getElementById("playSvgIcon");
+        const pauseSvg = document.getElementById("pauseSvgIcon");
+        const startPauseText = document.getElementById("startPauseText");
+        const finishBtn = document.getElementById("finishTimerBtn");
+        const halo = document.getElementById("timerHalo");
+
+        if (timerState.isRunning) {
+          badge.textContent = i18n[currentLang].statusRunning;
+          badge.className = "text-[11px] font-medium uppercase tracking-widest px-2.5 py-0.5 rounded-full bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 mb-2 transition-colors";
+          playSvg.classList.add("hidden");
+          pauseSvg.classList.remove("hidden");
+          startPauseText.textContent = i18n[currentLang].pauseBtn;
+          finishBtn.disabled = totalSeconds < 1;
+          halo.className = "w-56 h-56 sm:w-64 sm:h-64 md:w-72 md:h-72 rounded-full bg-indigo-500/20 pointer-events-none absolute active-halo";
+        } else if (totalSeconds > 0) {
+          badge.textContent = i18n[currentLang].statusPaused;
+          badge.className = "text-[11px] font-medium uppercase tracking-widest px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 mb-2 transition-colors";
+          playSvg.classList.remove("hidden");
+          pauseSvg.classList.add("hidden");
+          startPauseText.textContent = i18n[currentLang].resumeBtn;
+          finishBtn.disabled = false;
+          halo.className = "w-56 h-56 sm:w-64 sm:h-64 md:w-72 md:h-72 rounded-full bg-amber-500/10 pointer-events-none absolute transition-all duration-500";
+        } else {
+          badge.textContent = i18n[currentLang].statusReady;
+          badge.className = "text-[11px] font-medium uppercase tracking-widest px-2.5 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 mb-2 transition-colors";
+          playSvg.classList.remove("hidden");
+          pauseSvg.classList.add("hidden");
+          startPauseText.textContent = i18n[currentLang].startBtn;
+          finishBtn.disabled = true;
+          halo.className = "w-56 h-56 sm:w-64 sm:h-64 md:w-72 md:h-72 rounded-full bg-indigo-500/0 pointer-events-none absolute transition-all duration-500";
+        }
+
+        const todaySavedSec = getTodayTotalSeconds();
+        const liveTodaySec = todaySavedSec + totalSeconds;
+        const todayEl = document.getElementById("todayTotalMini");
+        if (todayEl) {
+          todayEl.textContent = i18n[currentLang].todayPrefix + " " + formatHMS(liveTodaySec);
+        }
+      }
+
+      // Render Sessions List
+      function renderSessionsList() {
+        const container = document.getElementById("sessionsListContainer");
+        const countSub = document.getElementById("historyCountSubtitle");
+        if (!container || !countSub) return;
+
+        countSub.textContent = sessions.length + " " + i18n[currentLang].sessionsCountSuffix;
+
+        if (sessions.length === 0) {
+          container.innerHTML =
+            '<div class="col-span-full h-44 flex flex-col items-center justify-center text-center text-zinc-400 dark:text-zinc-500">' +
+            '<p class="text-xs">' + i18n[currentLang].emptyHistory + '</p>' +
+            '</div>';
+          return;
+        }
+
+        const locale = currentLang === "fa" ? "fa-IR" : "en-US";
+
+        container.innerHTML = sessions
+          .map(function (s) {
+            const startDate = new Date(s.startTime || Date.now());
+            const endDate = new Date(s.endTime || Date.now());
+            const dateStr = startDate.toLocaleDateString(locale, { month: "short", day: "numeric" });
+            const timeRangeStr =
+              startDate.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" }) +
+              " - " +
+              endDate.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
+
+            return (
+              '<div class="group p-3.5 rounded-2xl bg-zinc-100/80 dark:bg-zinc-800/50 hover:bg-zinc-200/50 dark:hover:bg-zinc-800 border border-zinc-200/60 dark:border-zinc-800 flex items-center justify-between gap-3 transition">' +
+                '<div class="min-w-0 flex-1">' +
+                  '<div class="flex items-center gap-2">' +
+                    '<span class="text-xs font-semibold text-zinc-900 dark:text-zinc-100 truncate">' +
+                      escapeHtml(s.subject || i18n[currentLang].untitledSubject) +
+                    '</span>' +
+                  '</div>' +
+                  '<div class="flex items-center gap-2 text-[11px] text-zinc-400 dark:text-zinc-500 mt-0.5">' +
+                    '<span>' + dateStr + '</span>' +
+                    '<span>•</span>' +
+                    '<span dir="ltr">' + timeRangeStr + '</span>' +
+                  '</div>' +
+                '</div>' +
+                '<div class="flex items-center gap-2 shrink-0">' +
+                  '<span dir="ltr" class="tabular-timer text-xs font-mono font-semibold px-2.5 py-1 rounded-xl bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 border border-zinc-200/60 dark:border-zinc-700/60">' +
+                    formatHMS(s.durationSeconds || 0) +
+                  '</span>' +
+                  '<button type="button" onclick="window.requestDeleteSession(\'' + s.id + '\')" class="w-7 h-7 rounded-xl text-zinc-400 hover:text-rose-600 hover:bg-rose-500/10 flex items-center justify-center transition" title="Delete">' +
+                    '<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' +
+                      '<line x1="18" y1="6" x2="6" y2="18"></line>' +
+                      '<line x1="6" y1="6" x2="18" y2="18"></line>' +
+                    '</svg>' +
+                  '</button>' +
+                '</div>' +
+              '</div>'
+            );
+          })
+          .join("");
+      }
+
+      // Render Custom Interactive 7-Day Bar Chart
+      function updateAnalyticsAndChart() {
+        const todaySec = getTodayTotalSeconds();
+        const now = new Date();
+        const sevenDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6).getTime();
+
+        let weekSec = 0;
+        let totalSec = 0;
+        const subjectTotals = {};
+
+        sessions.forEach(function (s) {
+          const dur = Number(s.durationSeconds || 0);
+          totalSec += dur;
+          if ((s.endTime || 0) >= sevenDaysAgo) {
+            weekSec += dur;
+          }
+          const subj = s.subject || i18n[currentLang].untitledSubject;
+          subjectTotals[subj] = (subjectTotals[subj] || 0) + dur;
+        });
+
+        document.getElementById("statTodayVal").textContent = formatHMS(todaySec);
+        document.getElementById("statWeekVal").textContent = formatHMS(weekSec);
+        document.getElementById("statTotalVal").textContent = formatHMS(totalSec);
+
+        let topSubj = "—";
+        let maxSubjSec = 0;
+        Object.keys(subjectTotals).forEach(function (k) {
+          if (subjectTotals[k] > maxSubjSec) {
+            maxSubjSec = subjectTotals[k];
+            topSubj = k + " (" + Math.round(subjectTotals[k] / 60) + "m)";
+          }
+        });
+        document.getElementById("topSubjectVal").textContent = topSubj;
+
+        // Build 7-day data
+        const locale = currentLang === "fa" ? "fa-IR" : "en-US";
+        const days = [];
+        let maxMin = 10;
+
+        for (let i = 6; i >= 0; i--) {
+          const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+          const dayStart = d.getTime();
+          const dayEnd = dayStart + 86400000;
+          const label = d.toLocaleDateString(locale, { weekday: "short" });
+
+          const daySec = sessions.reduce(function (acc, s) {
+            const t = s.endTime || 0;
+            return t >= dayStart && t < dayEnd ? acc + Number(s.durationSeconds || 0) : acc;
+          }, 0);
+
+          const mins = Math.round((daySec / 60) * 10) / 10;
+          if (mins > maxMin) maxMin = mins;
+          days.push({
+            label: label,
+            dateLabel: d.toLocaleDateString(locale, { year: "numeric", month: "long", day: "numeric" }),
+            duration: formatHMS(daySec),
+            mins: mins,
+            isToday: i === 0
+          });
+        }
+
+        const barsContainer = document.getElementById("customBarChart");
+        const labelsContainer = document.getElementById("customBarLabels");
+        if (!barsContainer || !labelsContainer) return;
+
+        barsContainer.innerHTML = days
+          .map(function (d) {
+            const heightPct = d.mins > 0 ? Math.max(10, Math.round((d.mins / maxMin) * 100)) : 4;
+            const barClass = d.isToday
+              ? "bg-indigo-600 dark:bg-indigo-400"
+              : d.mins > 0
+              ? "bg-zinc-800 dark:bg-zinc-200"
+              : "bg-zinc-200 dark:bg-zinc-700/60";
+
+            return (
+              '<div class="flex-1 h-full flex flex-col items-center justify-end group relative" tabindex="0" role="img" aria-label="' + d.dateLabel + ': ' + d.duration + '">' +
+                '<span class="pointer-events-none absolute top-0 left-1/2 -translate-x-1/2 z-20 whitespace-nowrap rounded-lg bg-zinc-900 px-2.5 py-1.5 text-[10px] font-medium text-white shadow-lg opacity-0 invisible transition group-hover:opacity-100 group-hover:visible group-focus:opacity-100 group-focus:visible dark:bg-white dark:text-zinc-900">' +
+                  d.dateLabel + ' <span dir="ltr" class="font-mono">' + d.duration + '</span>' +
+                '</span>' +
+                '<span dir="ltr" class="text-[10px] font-mono text-zinc-500 dark:text-zinc-400 mb-1 opacity-85 group-hover:opacity-100 transition">' +
+                  (d.mins > 0 ? d.mins + "m" : "") +
+                '</span>' +
+                '<div class="w-full max-w-[28px] rounded-t-xl transition-all duration-500 ' + barClass + '" style="height: ' + heightPct + '%"></div>' +
+              '</div>'
+            );
+          })
+          .join("");
+
+        labelsContainer.innerHTML = days
+          .map(function (d) {
+            return (
+              '<span class="text-[10px] sm:text-xs font-medium ' +
+              (d.isToday ? "text-indigo-600 dark:text-indigo-400 font-bold" : "text-zinc-400 dark:text-zinc-500") +
+              '">' +
+              d.label +
+              '</span>'
+            );
+          })
+          .join("");
+      }
+
+      // Global Actions
+      window.toggleStartPause = function () {
+        const now = Date.now();
+        if (!timerState.isRunning) {
+          if (!timerState.sessionInitialStart) {
+            timerState.sessionInitialStart = now;
+          }
+          timerState.startTime = now;
+          timerState.isRunning = true;
+        } else {
+          timerState.accumulatedMs = getElapsedMs();
+          timerState.startTime = null;
+          timerState.isRunning = false;
+        }
+        timerState.updatedAt = now;
+        persistLocalTimer();
+        updateTimerUI();
+      };
+
+      window.handleSubjectChange = function (val) {
+        timerState.subject = val;
+        timerState.updatedAt = Date.now();
+        persistLocalTimer();
+      };
+
+      window.finishAndSaveSession = function () {
+        const totalMs = getElapsedMs();
+        const totalSeconds = Math.floor(totalMs / 1000);
+        if (totalSeconds < 1) return;
+
+        const endTime = Date.now();
+        const startTime = timerState.sessionInitialStart || (endTime - totalMs);
+        const cleanSubject = (timerState.subject || "").trim() || i18n[currentLang].untitledSubject;
+
+        const sessionObj = {
+          id: "sess_" + endTime + "_" + Math.random().toString(36).substring(2, 7),
+          subject: cleanSubject,
+          startTime: startTime,
+          endTime: endTime,
+          durationSeconds: totalSeconds,
+          dateISO: new Date(endTime).toISOString()
+        };
+
+        timerState = {
+          isRunning: false,
+          startTime: null,
+          accumulatedMs: 0,
+          sessionInitialStart: null,
+          subject: "",
+          updatedAt: Date.now()
+        };
+        document.getElementById("subjectInput").value = "";
+        persistLocalTimer();
+        updateTimerUI();
+
+        sessions.unshift(sessionObj);
+        persistLocalSessions();
+        renderSessionsList();
+        updateAnalyticsAndChart();
+        showToast(i18n[currentLang].savedToast);
+
+        window.__cloudHooks.saveSession(sessionObj);
+      };
+
+      // Delete Confirmation Modal Logic
+      window.requestDeleteSession = function (sessionId) {
+        const target = sessions.find(function (s) { return s.id === sessionId; });
+        if (!target) return;
+        pendingDeleteSessionId = sessionId;
+
+        const infoEl = document.getElementById("deleteConfirmSessionInfo");
+        const subj = target.subject || i18n[currentLang].untitledSubject;
+        const dur = formatHMS(target.durationSeconds || 0);
+        if (infoEl) infoEl.textContent = subj + " (" + dur + ")";
+
+        document.getElementById("deleteConfirmModal").classList.remove("hidden");
+      };
+
+      window.closeDeleteConfirmModal = function () {
+        pendingDeleteSessionId = null;
+        document.getElementById("deleteConfirmModal").classList.add("hidden");
+      };
+
+      window.confirmDeleteSession = function () {
+        if (!pendingDeleteSessionId) return;
+        const sessionId = pendingDeleteSessionId;
+        window.closeDeleteConfirmModal();
+
+        sessions = sessions.filter(function (s) { return s.id !== sessionId; });
+        persistLocalSessions();
+        renderSessionsList();
+        updateAnalyticsAndChart();
+        updateTimerUI();
+        showToast(i18n[currentLang].deletedToast);
+
+        window.__cloudHooks.deleteSession(sessionId);
+      };
+
+      // Manual Modal Logic
+      window.openManualModal = function () {
+        document.getElementById("manualModal").classList.remove("hidden");
+      };
+
+      window.closeManualModal = function () {
+        document.getElementById("manualModal").classList.add("hidden");
+      };
+
+      window.saveManualSession = function () {
+        const subj = document.getElementById("manualSubject").value.trim() || i18n[currentLang].untitledSubject;
+        const hrs = Math.max(0, parseInt(document.getElementById("manualHours").value || "0", 10));
+        const mins = Math.max(0, parseInt(document.getElementById("manualMinutes").value || "0", 10));
+        const totalSeconds = hrs * 3600 + mins * 60;
+
+        if (totalSeconds <= 0) return;
+
+        const endTime = Date.now();
+        const startTime = endTime - totalSeconds * 1000;
+        const sessionObj = {
+          id: "sess_" + endTime + "_" + Math.random().toString(36).substring(2, 7),
+          subject: subj,
+          startTime: startTime,
+          endTime: endTime,
+          durationSeconds: totalSeconds,
+          dateISO: new Date(endTime).toISOString()
+        };
+
+        sessions.unshift(sessionObj);
+        persistLocalSessions();
+        document.getElementById("manualSubject").value = "";
+        window.closeManualModal();
+        renderSessionsList();
+        updateAnalyticsAndChart();
+        updateTimerUI();
+        showToast(i18n[currentLang].savedToast);
+
+        window.__cloudHooks.saveSession(sessionObj);
+      };
+
+      // Excel / CSV Export
+      window.exportSessionsToExcel = function () {
+        if (!sessions || sessions.length === 0) {
+          showToast(i18n[currentLang].noDataExportToast);
+          return;
+        }
+
+        const isFa = currentLang === "fa";
+        const locale = isFa ? "fa-IR" : "en-US";
+        const headers = isFa
+          ? ["مبحث", "تاریخ", "ساعت شروع", "ساعت پایان", "مدت زمان (HH:MM:SS)", "مدت به دقیقه", "مدت به ثانیه"]
+          : ["Subject", "Date", "Start Time", "End Time", "Duration (HH:MM:SS)", "Duration (Minutes)", "Duration (Seconds)"];
+
+        const rows = sessions.map(function (s) {
+          const startD = new Date(s.startTime || Date.now());
+          const endD = new Date(s.endTime || Date.now());
+          const dateStr = startD.toLocaleDateString(locale);
+          const startStr = startD.toLocaleTimeString(locale);
+          const endStr = endD.toLocaleTimeString(locale);
+          const hms = formatHMS(s.durationSeconds || 0);
+          const mins = ((s.durationSeconds || 0) / 60).toFixed(1);
+          const secs = s.durationSeconds || 0;
+
+          return [
+            '"' + String(s.subject || "").replace(/"/g, '""') + '"',
+            '"' + dateStr + '"',
+            '"' + startStr + '"',
+            '"' + endStr + '"',
+            '"' + hms + '"',
+            mins,
+            secs
+          ].join(",");
+        });
+
+        const csvContent = "\uFEFF" + [headers.join(","), ...rows].join("\r\n");
+        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "study-time-report-" + new Date().toISOString().slice(0, 10) + ".csv";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+
+        showToast(i18n[currentLang].excelExportedToast);
+      };
+
+      // Tab Navigation & Auto-Hide Top CSV Button on Tab 1
+      window.switchTab = function (tabIndex) {
+        activeTab = tabIndex;
+        const track = document.getElementById("viewsTrack");
+        if (track) {
+          track.style.transform = "translateX(-" + (tabIndex * 25) + "%)";
+        }
+
+        // Hide top CSV button when on Tab 1 (Intervals) because Tab 1 has its own CSV button next to + Add
+        const quickExportBtn = document.getElementById("quickExportBtn");
+        if (quickExportBtn) {
+          if (tabIndex === 1) {
+            quickExportBtn.classList.add("hidden");
+          } else {
+            quickExportBtn.classList.remove("hidden");
+          }
+        }
+
+        for (let i = 0; i < 4; i++) {
+          const btn = document.getElementById("navBtn" + i);
+          if (!btn) continue;
+          if (i === tabIndex) {
+            btn.className =
+              "nav-tab-btn flex-1 h-full rounded-[15px] flex items-center justify-center gap-1.5 text-xs font-semibold transition-all duration-300 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-sm";
+          } else {
+            btn.className =
+              "nav-tab-btn flex-1 h-full rounded-[15px] flex items-center justify-center gap-1.5 text-xs font-medium transition-all duration-300 text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200";
+          }
+        }
+
+        if (tabIndex === 2) {
+          updateAnalyticsAndChart();
+        }
+      };
+
+      // Theme & Language Switching
+      function applyTheme(theme) {
+        const root = document.documentElement;
+        if (theme === "dark") {
+          root.classList.add("dark");
+          root.classList.remove("light");
+        } else {
+          root.classList.remove("dark");
+          root.classList.add("light");
+        }
+      }
+
+      window.toggleTheme = function () {
+        currentTheme = currentTheme === "light" ? "dark" : "light";
+        try { localStorage.setItem(LS_THEME_KEY, currentTheme); } catch (e) {}
+        applyTheme(currentTheme);
+        updateAnalyticsAndChart();
+      };
+
+      function applyLanguage(lang) {
+        const dir = lang === "fa" ? "rtl" : "ltr";
+        document.documentElement.lang = lang;
+        document.documentElement.dir = dir;
+
+        document.querySelectorAll("[data-pane-dir]").forEach(function (pane) {
+          pane.setAttribute("dir", dir);
+        });
+
+        const langBtn = document.getElementById("langToggleBtn");
+        if (langBtn) langBtn.textContent = lang === "fa" ? "EN" : "فا";
+
+        document.querySelectorAll("[data-i18n]").forEach(function (el) {
+          const key = el.getAttribute("data-i18n");
+          if (i18n[lang] && i18n[lang][key]) {
+            el.textContent = i18n[lang][key];
+          }
+        });
+
+        document.querySelectorAll("[data-i18n-placeholder]").forEach(function (el) {
+          const key = el.getAttribute("data-i18n-placeholder");
+          if (i18n[lang] && i18n[lang][key]) {
+            el.setAttribute("placeholder", i18n[lang][key]);
+          }
+        });
+      }
+
+      window.toggleLanguage = function () {
+        currentLang = currentLang === "fa" ? "en" : "fa";
+        try { localStorage.setItem(LS_LANG_KEY, currentLang); } catch (e) {}
+        applyLanguage(currentLang);
+        updateTimerUI();
+        renderSessionsList();
+        updateAnalyticsAndChart();
+      };
+
+      // Auth UI proxy methods
+      window.handleEmailAuth = function (mode) {
+        window.__cloudHooks.emailAuth(mode);
+      };
+      window.handleGoogleAuth = function () {
+        window.__cloudHooks.googleAuth();
+      };
+      window.handleSignOut = function () {
+        window.__cloudHooks.signOut();
+      };
+
+      // Expose state updater for Firebase realtime listener
+      window.__applyCloudSnapshot = function (fetchedSessions, remoteActiveTimer) {
+        if (remoteActiveTimer && Number(remoteActiveTimer.updatedAt || 0) > Number(timerState.updatedAt || 0)) {
+          timerState = {
+            isRunning: Boolean(remoteActiveTimer.isRunning),
+            startTime: remoteActiveTimer.startTime || null,
+            accumulatedMs: Number(remoteActiveTimer.accumulatedMs || 0),
+            sessionInitialStart: remoteActiveTimer.sessionInitialStart || null,
+            subject: remoteActiveTimer.subject || "",
+            updatedAt: Number(remoteActiveTimer.updatedAt || Date.now())
+          };
+          try { localStorage.setItem(LS_TIMER_KEY, JSON.stringify(timerState)); } catch (e) {}
+          const subjInput = document.getElementById("subjectInput");
+          if (subjInput && document.activeElement !== subjInput) {
+            subjInput.value = timerState.subject;
+          }
+          updateTimerUI();
+        } else if (Number(timerState.updatedAt || 0) > Number((remoteActiveTimer && remoteActiveTimer.updatedAt) || 0)) {
+          window.__cloudHooks.syncTimer(timerState);
+        }
+
+        if (Array.isArray(fetchedSessions)) {
+          fetchedSessions.sort(function (a, b) {
+            return Number(b.startTime || 0) - Number(a.startTime || 0);
+          });
+          sessions = fetchedSessions;
+          persistLocalSessions();
+          renderSessionsList();
+          updateAnalyticsAndChart();
+          updateTimerUI();
+        }
+      };
+
+      // Touch Swipe Support on Viewport
+      const trackEl = document.getElementById("viewsTrack");
+      let touchStartX = null;
+      let touchStartY = null;
+      if (trackEl) {
+        trackEl.addEventListener("touchstart", function (e) {
+          touchStartX = e.changedTouches[0].screenX;
+          touchStartY = e.changedTouches[0].screenY;
+        }, { passive: true });
+
+        trackEl.addEventListener("touchend", function (e) {
+          if (touchStartX === null || touchStartY === null) return;
+          const dx = e.changedTouches[0].screenX - touchStartX;
+          const dy = e.changedTouches[0].screenY - touchStartY;
+          if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+            if (dx < 0 && activeTab < 3) {
+              window.switchTab(activeTab + 1);
+            } else if (dx > 0 && activeTab > 0) {
+              window.switchTab(activeTab - 1);
+            }
+          }
+          touchStartX = null;
+          touchStartY = null;
+        }, { passive: true });
+      }
+
+      // Boot Synchronous UI Immediately
+      function bootCoreApp() {
+        applyTheme(currentTheme);
+        applyLanguage(currentLang);
+
+        try {
+          const cachedSessions = localStorage.getItem(LS_SESSIONS_KEY);
+          if (cachedSessions) sessions = JSON.parse(cachedSessions);
+        } catch (e) {
+          sessions = [];
+        }
+
+        try {
+          const savedTimer = localStorage.getItem(LS_TIMER_KEY);
+          if (savedTimer) {
+            const parsed = JSON.parse(savedTimer);
+            timerState = Object.assign({}, timerState, parsed);
+            const subjInput = document.getElementById("subjectInput");
+            if (subjInput) subjInput.value = timerState.subject || "";
+          }
+        } catch (e) {}
+
+        updateTimerUI();
+        renderSessionsList();
+        updateAnalyticsAndChart();
+
+        setInterval(function () {
+          if (timerState.isRunning) {
+            updateTimerUI();
+          }
+        }, 250);
+      }
+
+      bootCoreApp();
+    })();
+  </script>
+
+  <!-- ================= NON-BLOCKING FIREBASE CLOUD SYNC MODULE ================= -->
+  <script type="module">
+    const userFirebaseConfig = {
+      apiKey: "AIzaSyAz-bSS_aNtcaSDbDtVk1dbY3IVToPE6sI",
+      authDomain: "time-tracker-50976.firebaseapp.com",
+      projectId: "time-tracker-50976",
+      storageBucket: "time-tracker-50976.firebasestorage.app",
+      messagingSenderId: "582206853950",
+      appId: "1:582206853950:web:ac9a2c5de070badb41526f",
+      measurementId: "G-0S9VQSPS57"
+    };
+
+    const RULE_APP_ID = userFirebaseConfig.appId;
+    const ACTIVE_TIMER_DOC_ID = "__active_timer__";
+
+    async function connectFirebaseSafely() {
+      try {
+        const [
+          { initializeApp },
+          {
+            getAuth,
+            onAuthStateChanged,
+            signInAnonymously,
+            signInWithEmailAndPassword,
+            createUserWithEmailAndPassword,
+            GoogleAuthProvider,
+            signInWithPopup,
+            signOut
+          },
+          {
+            getFirestore,
+            collection,
+            doc,
+            setDoc,
+            deleteDoc,
+            onSnapshot
+          }
+        ] = await Promise.all([
+          import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"),
+          import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js"),
+          import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js")
+        ]);
+
+        const app = initializeApp(userFirebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        let currentUser = null;
+        let unsubscribeSnapshot = null;
+
+        function subscribeUserDocs(uid) {
+          if (unsubscribeSnapshot) {
+            unsubscribeSnapshot();
+            unsubscribeSnapshot = null;
+          }
+
+          const colRef = collection(db, "artifacts", RULE_APP_ID, "users", uid, "study_sessions");
+          unsubscribeSnapshot = onSnapshot(
+            colRef,
+            (snapshot) => {
+              const fetched = [];
+              let remoteTimer = null;
+              snapshot.forEach((docSnap) => {
+                const data = docSnap.data();
+                if (docSnap.id === ACTIVE_TIMER_DOC_ID) {
+                  remoteTimer = data;
+                } else {
+                  fetched.push({ id: docSnap.id, ...data });
+                }
+              });
+              if (window.__applyCloudSnapshot) {
+                window.__applyCloudSnapshot(fetched, remoteTimer);
+              }
+            },
+            (err) => {
+              console.warn("Firestore sync notice:", err.message);
+            }
+          );
+        }
+
+        // Attach cloud hooks to core app
+        window.__cloudHooks.syncTimer = async (tState) => {
+          if (!currentUser) return;
+          try {
+            const ref = doc(db, "artifacts", RULE_APP_ID, "users", currentUser.uid, "study_sessions", ACTIVE_TIMER_DOC_ID);
+            await setDoc(ref, { ...tState, isTimerStateDoc: true });
+          } catch (e) {}
+        };
+
+        window.__cloudHooks.saveSession = async (sessionObj) => {
+          if (!currentUser) return;
+          try {
+            const ref = doc(db, "artifacts", RULE_APP_ID, "users", currentUser.uid, "study_sessions", sessionObj.id);
+            await setDoc(ref, sessionObj);
+          } catch (e) {}
+        };
+
+        window.__cloudHooks.deleteSession = async (sessionId) => {
+          if (!currentUser) return;
+          try {
+            const ref = doc(db, "artifacts", RULE_APP_ID, "users", currentUser.uid, "study_sessions", sessionId);
+            await deleteDoc(ref);
+          } catch (e) {}
+        };
+
+        window.__cloudHooks.emailAuth = async (mode) => {
+          const email = document.getElementById("authEmailInput").value.trim();
+          const pass = document.getElementById("authPasswordInput").value;
+          if (!email || !pass) {
+            window.showToast("Please enter email & password");
+            return;
+          }
+          try {
+            if (mode === "signup") {
+              await createUserWithEmailAndPassword(auth, email, pass);
+              window.showToast("Account created & synced!");
+            } else {
+              await signInWithEmailAndPassword(auth, email, pass);
+              window.showToast("Signed in & synced!");
+            }
+          } catch (err) {
+            window.showToast(err.message.replace("Firebase:", "").trim());
+          }
+        };
+
+        window.__cloudHooks.googleAuth = async () => {
+          try {
+            const provider = new GoogleAuthProvider();
+            await signInWithPopup(auth, provider);
+            window.showToast("Signed in with Google!");
+          } catch (err) {
+            window.showToast(err.message.replace("Firebase:", "").trim());
+          }
+        };
+
+        window.__cloudHooks.signOut = async () => {
+          try {
+            await signOut(auth);
+            window.showToast("Signed out");
+          } catch (e) {}
+        };
+
+        onAuthStateChanged(auth, async (user) => {
+          const loggedInCard = document.getElementById("loggedInCard");
+          const authFormCard = document.getElementById("authFormCard");
+          const emailDisp = document.getElementById("userEmailDisplay");
+          const uidDisp = document.getElementById("userUidDisplay");
+
+          if (user) {
+            currentUser = user;
+            if (!user.isAnonymous) {
+              loggedInCard.classList.remove("hidden");
+              authFormCard.classList.add("hidden");
+              emailDisp.textContent = user.email || "Authenticated User";
+              uidDisp.textContent = "UID: " + user.uid;
+            } else {
+              loggedInCard.classList.remove("hidden");
+              authFormCard.classList.remove("hidden");
+              emailDisp.textContent = "Guest Cloud Sync";
+              uidDisp.textContent = "UID: " + user.uid;
+            }
+            subscribeUserDocs(user.uid);
+          } else {
+            currentUser = null;
+            loggedInCard.classList.add("hidden");
+            authFormCard.classList.remove("hidden");
+            try {
+              await signInAnonymously(auth);
+            } catch (e) {}
+          }
+        });
+      } catch (err) {
+        console.warn("Running in local-first mode:", err);
+      }
+    }
+
+    connectFirebaseSafely();
+  </script>
+</body>
+</html>
